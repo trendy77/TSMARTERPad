@@ -1,0 +1,26 @@
+void sendRequest(int lightNo, String cmd, String value) {
+String request = "/api/fRgcNsvxh3ytQKVUZlCso0KbAn7zOlMhtkVmwzQG/lights/";
+request += lightNo;
+request += "/state/ HTTP/1.1";
+String contentType = "application/json";     /////  contentType="application/x-www-form-urlencoded";
+String hueCmd = "{\"on\":true}";
+//hueCmd += "true";
+//hueCmd += "}";
+Serial.print("Request to server: ");
+//Serial.println(request);
+client.connect(bridge_ip, 80);
+client.println("PUT "+ request);
+const char LIGHTS_ON[] = "{\"on\":true}";
+client.println("Content-type: text/xml; charset=\"utf-8\"");
+client.println("Content-Length: 11");
+client.println("");
+client.println(LIGHTS_ON);
+client.println();
+while (client.available()) {
+if (client.available()) {
+String line = client.readStringUntil('\r');
+Serial.print(line);
+
+}
+}
+}

@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "name": "PlatformIO Debugger",
+            "target": "c:/Users/trend/Documents/PlatformIO/Projects/180224-114243-megaatmega1280/.pioenvs/megaatmega1280/firmware.elf",
+            "gdbpath": "C:/Users/trend/.platformio/penv/Scripts/piodebuggdb",
+            "autorun": [ "source .pioinit" ],
+            "preLaunchTask": "PlatformIO: Pre-Debug",
+            "internalConsoleOptions": "openOnSessionStart"
+        }
+    ]
+}
