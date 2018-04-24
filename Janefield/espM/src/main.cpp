@@ -29,6 +29,9 @@ C:\Users\trend\Documents\PlatformIO\Projects\171111-175952-nodemcuv2\src
 #include <IRrecv.h>
 #include <IRutils.h>
 
+WiFiClient wiFi;
+int incomingByte = 0;
+MDNSResponder mdns;
 // COMMENT OUT DEPENDING ON WHICH ONE....
 IPAddress ip(10, 77, 0, 34);
 ESP8266WebServer server(3434);
@@ -40,7 +43,7 @@ uint16_t RECV_PIN = 4;
 Rsend irsend(5);
 
 byte ledPin = 0;
-const char ssid[] = "Northern Frontier Intertubes";
+const char ssid[] = "Northern Frontier Interwebs";
 const char pass[] = "num4jkha8nnk";
 
 // TEMPC AND HUMIDITY
@@ -177,9 +180,7 @@ void setup()
         delay(900);
         Serial.print(".");
     }
-    server.begin();
-    IPAddress myAddress = WiFi.localIP();
-    Serial.println(myAddress);
+    
     if (mdns.begin(HOST_NAME, WiFi.localIP()))
     {
         Serial.println("MDNS responder started");
@@ -228,42 +229,10 @@ void setup()
     Serial.print(sensor.resolution);
     Serial.println("%");
     Serial.println("------------------------------------");
-   
-    ThingSpeak.begin(clientTH);
+       ThingSpeak.begin(clientTH);
 
     pinMode(ledPin, OUTPUT);
     digitalWrite(ledPin, HIGH);
-
-    ArduinoOTA.onStart([]() { // switch off all the PWMs during upgrade
-        for (int i = 0; i < 3; i++)
-            analogWrite(rgb_pins[i], 0);
-    });
-    ArduinoOTA.onEnd([]() { // do a fancy thing with our board led at end
-        for (int i = 0; i < 30; i++)
-        {
-            analogWrite(Blue, (i * 100) % 1001);
-            delay(50);
-            analogWrite(Green, (1 - (i * 100) % 1001));
-        }
-    });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR)
-            Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR)
-            Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR)
-            Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR)
-            Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR)
-            Serial.println("End Failed");
-    });
-
-    ArduinoOTA.begin();
 
     irrecv.enableIRIn();
     delay(500);

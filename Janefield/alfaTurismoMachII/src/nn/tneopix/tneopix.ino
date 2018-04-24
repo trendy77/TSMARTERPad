@@ -1,13 +1,5 @@
 /*
-C:\Users\trend\Documents\PlatformIO\Projects\180109-153921-megaatmega2560\src
-
-ALFA TURISMO GT MACH II
-KNIGHT RIDER GRILLE
-MEGA w ESP NODE 
-
-- added PIR motion detection on pin 41 - atm.
-- 
-
+neopixel node
 */
 
 #include <Arduino.h>
@@ -15,78 +7,14 @@ MEGA w ESP NODE
 #ifdef __AVR__
 #include <avr/power.h>
 #endif
-
-#include <ELClient.h>
-#include <ELClientRest.h>
-#include <ELClientSocket.h>
-
-#define BUFLEN 266
-#define BUFLENN 266
-
-//###########################################################
-// For boards using the hardware serial port!
-//###########################################################
-// Initialize a connection to esp-link using the normal hardware serial port both for
-// SLIP and for debug messages.
-ELClient esp(&Serial3, &Serial3);
-// Initialize a REST client on the connection to esp-link
-ELClientRest rest(&esp);
-
-boolean wifiConnected = false;
-long timer;
-
-// Initialize a TCP socket client on the connection to esp-link
-elclientsocket tcp(&esp);
-// Connection number for tcp
-int tcpConnNum;
-
-// Timer value to send out data
-uint32_t wait;
-// Time to wait between sending out data
-uint32_t waitTime;
-// IP address for this demo is a local IP.
-// Replace it with the IP address where you have a TCP socket server running
-char *const tcpServer PROGMEM = "10.0.77.120";
-// Port for this demo is the port used by the TCP socket server.
-// Replace it with the port that your TCP socket server is listening to
-uint16_t const tcpPort PROGMEM = 7002;
-
-char *const errTxt[] PROGMEM = {"No error, everything OK.", "Out of memory.", "Unknown code.", "Timeout.", "Routing problem.", "Operation in progress.",
-                                "Unknown code.", "Total number exceeds the maximum limitation.", "Connection aborted.", "Connection reset.", "Connection closed.",
-                                "Not connected.", "Illegal argument.", "Unknown code.", "UDP send error.", "Already connected."};
-char *getErrTxt(int16_t commError)
-{
-    commError = commError * -1;
-    if (commError <= 15)
-    {
-        return (char *)pgm_read_word(&errTxt[commError]);
-    }
-    else
-    {
-        return (char *)pgm_read_word(&errTxt[2]); // Unknown code
-    }
-}
 bool shownMenu = false;
-
-#define ledPin 13
-#define pirPin 41
-bool motion = false;
-//the time when the sensor outputs a low impulse
-long unsigned int lowIn;
-//the amount of milliseconds the sensor has to be low before we assume all motion has stopped
-int pause = 5000;
-bool lockLow = true;
-bool takeLowTime;
-int calibrationTime = 30;
-bool motionActive = false;
-
-int watsdoin = 11;
-#define PIN A15
-#define NUMPIXELS 8
+int watsDoin = 11;
+#define PIN A8
+#define NUMPIXELS 16
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 int delayval = 500;
 long lastTime1, lastTime2, time = 0;
-
+int watsdoin = 11;
 
 uint32_t dimColor(uint32_t color, uint8_t width)
 {
@@ -178,6 +106,7 @@ void knightRider(uint16_t cycles, uint16_t speed, uint8_t width, uint32_t color)
         }
     }
 }
+
 void goSolid(int colour)
 {
     switch (colour)
@@ -211,7 +140,7 @@ void goSolid(int colour)
         break;
     }
 }
-void kittaLL()
+void kitt()
 {
     knightRider(1, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
     knightRider(1, 46, 3, 0xFF00FF); // Cycles, Speed, Width, RGB Color (purple)
@@ -275,6 +204,52 @@ void copMode()
     delay(delayval);
     clearStrip();
 }
+void serialSet()
+{
+    if (shownMenu == false)
+    {
+        Serial.println("by all means, please choose a lighting scheme for the AlfaGT....");
+        Serial.println("1- 2- 3- 4- 5- 6- 7- 8- 9- 10- ");
+        shownMenu = true;
+    }
+    if (Serial.available())
+    {
+        char dato = Serial.read();
+        switch (dato)
+        {
+        case '1':
+            goSolid(1);
+            break;
+        case '2':
+            goSolid(2);
+            break;
+        case '3':
+            goSolid(3);
+            break;
+        case '4':
+            knightRider(4, 46, 3, 0x0000FF); // Cycles, Speed, Width, RGB Color (blue)
+            break;
+        case '5':
+            knightRider(4, 46, 5, 0xFF0000); // red
+            break;
+        case '6':
+            knightRider(4, 46, 3, 0xFFFF00); // Cycles, Speed, Width, RGB Color (yellow)
+            break;
+        case '7':
+            knightRider(4, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
+            break;
+        case '8':
+            knightRider(4, 46, 2, 0xFFFFFF); // Cycles, Speed, Width, RGB Color (white)
+            break;
+        case '9':
+            clearStrip();
+            break;
+        case 'c':
+            copMode();
+            break;
+        }
+    }
+}
 void rainBow()
 {
     byte width = 2;
@@ -284,4 +259,52 @@ void rainBow()
         width++;
     }
     clearStrip();
+}
+
+void setLights()
+{
+    if (watsdoin == 11)
+    {
+        rainBow();
+    }
+    else if (watsdoin == 12)
+    {
+        kitt();
+    }
+    else if (watsdoin == 13)
+    {
+        for (int i = 0; i < NUMPIXELS; i++)
+        {
+            strip.setPixelColor(i, strip.Color(100, 100, 100)); // Moderately bright white??
+            strip.show();
+        }
+    }
+    watsdoin++;
+}
+
+void setup()
+{
+    Serial.begin(115200);
+    Serial.print("booting");
+    delay(500);
+    strip.begin(); // This initializes the NeoPixel library.
+    watsdoin = 11;
+  
+}
+
+void loop()
+{
+      
+   setLights();
+    //serialSet();
+
+    // if (time >= (lastTime2 + 300000))
+    // { // every 60 secs
+    //     rainBow();
+    // }
+    //   if (time >= (lastTime1 + 600000))
+    // { // every 100 secs
+    //   kitt();
+    //  lastTime1 = time;
+    //}
 }
