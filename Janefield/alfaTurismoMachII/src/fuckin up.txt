@@ -1,0 +1,287 @@
+/*
+C:\Users\trend\Documents\PlatformIO\Projects\180109-153921-megaatmega2560\src
+
+ALFA TURISMO GT MACH II
+KNIGHT RIDER GRILLE
+MEGA w ESP NODE 
+
+- added PIR motion detection on pin 41 - atm.
+- 
+
+*/
+
+#include <Arduino.h>
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+#include <avr/power.h>
+#endif
+
+#include <ELClient.h>
+#include <ELClientRest.h>
+#include <ELClientSocket.h>
+
+#define BUFLEN 266
+#define BUFLENN 266
+
+//###########################################################
+// For boards using the hardware serial port!
+//###########################################################
+// Initialize a connection to esp-link using the normal hardware serial port both for
+// SLIP and for debug messages.
+ELClient esp(&Serial3, &Serial3);
+// Initialize a REST client on the connection to esp-link
+ELClientRest rest(&esp);
+
+boolean wifiConnected = false;
+long timer;
+
+// Initialize a TCP socket client on the connection to esp-link
+elclientsocket tcp(&esp);
+// Connection number for tcp
+int tcpConnNum;
+
+// Timer value to send out data
+uint32_t wait;
+// Time to wait between sending out data
+uint32_t waitTime;
+// IP address for this demo is a local IP.
+// Replace it with the IP address where you have a TCP socket server running
+char *const tcpServer PROGMEM = "10.0.77.120";
+// Port for this demo is the port used by the TCP socket server.
+// Replace it with the port that your TCP socket server is listening to
+uint16_t const tcpPort PROGMEM = 7002;
+
+char *const errTxt[] PROGMEM = {"No error, everything OK.", "Out of memory.", "Unknown code.", "Timeout.", "Routing problem.", "Operation in progress.",
+                                "Unknown code.", "Total number exceeds the maximum limitation.", "Connection aborted.", "Connection reset.", "Connection closed.",
+                                "Not connected.", "Illegal argument.", "Unknown code.", "UDP send error.", "Already connected."};
+char *getErrTxt(int16_t commError)
+{
+    commError = commError * -1;
+    if (commError <= 15)
+    {
+        return (char *)pgm_read_word(&errTxt[commError]);
+    }
+    else
+    {
+        return (char *)pgm_read_word(&errTxt[2]); // Unknown code
+    }
+}
+bool shownMenu = false;
+
+#define ledPin 13
+#define pirPin 41
+bool motion = false;
+//the time when the sensor outputs a low impulse
+long unsigned int lowIn;
+//the amount of milliseconds the sensor has to be low before we assume all motion has stopped
+int pause = 5000;
+bool lockLow = true;
+bool takeLowTime;
+int calibrationTime = 30;
+bool motionActive = false;
+
+int watsdoin = 11;
+#define PIN A15
+#define NUMPIXELS 8
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+int delayval = 500;
+long lastTime1, lastTime2, time = 0;
+
+
+uint32_t dimColor(uint32_t color, uint8_t width)
+{
+    return (((color & 0xFF0000) / width) & 0xFF0000) + (((color & 0x00FF00) / width) & 0x00FF00) + (((color & 0x0000FF) / width) & 0x0000FF);
+}
+void clearStrip()
+{
+    for (int i = 0; i < NUMPIXELS; i++)
+    {
+        strip.setPixelColor(i, 0x000000);
+        strip.show();
+    }
+}
+uint32_t colorWheel(byte WheelPos)
+{
+    byte state = WheelPos / 21;
+    switch (state)
+    {
+    case 0:
+        return strip.Color(255, 0, 255 - ((((WheelPos % 21) + 1) * 6) + 127));
+        break;
+    case 1:
+        return strip.Color(255, ((WheelPos % 21) + 1) * 6, 0);
+        break;
+    case 2:
+        return strip.Color(255, (((WheelPos % 21) + 1) * 6) + 127, 0);
+        break;
+    case 3:
+        return strip.Color(255 - (((WheelPos % 21) + 1) * 6), 255, 0);
+        break;
+    case 4:
+        return strip.Color(255 - (((WheelPos % 21) + 1) * 6) + 127, 255, 0);
+        break;
+    case 5:
+        return strip.Color(0, 255, ((WheelPos % 21) + 1) * 6);
+        break;
+    case 6:
+        return strip.Color(0, 255, (((WheelPos % 21) + 1) * 6) + 127);
+        break;
+    case 7:
+        return strip.Color(0, 255 - (((WheelPos % 21) + 1) * 6), 255);
+        break;
+    case 8:
+        return strip.Color(0, 255 - ((((WheelPos % 21) + 1) * 6) + 127), 255);
+        break;
+    case 9:
+        return strip.Color(((WheelPos % 21) + 1) * 6, 0, 255);
+        break;
+    case 10:
+        return strip.Color((((WheelPos % 21) + 1) * 6) + 127, 0, 255);
+        break;
+    case 11:
+        return strip.Color(255, 0, 255 - (((WheelPos % 21) + 1) * 6));
+        break;
+    default:
+        return strip.Color(0, 0, 0);
+        break;
+    }
+}
+
+void knightRider(uint16_t cycles, uint16_t speed, uint8_t width, uint32_t color)
+{
+    uint32_t old_val[8];
+    for (uint16_t i = 0; i < cycles; i++)
+    {
+        for (uint16_t count = 1; count < NUMPIXELS; count++)
+        {
+            strip.setPixelColor(count, color);
+            old_val[count] = color;
+            for (uint16_t x = count; x > 0; x--)
+            {
+                old_val[x - 1] = dimColor(old_val[x - 1], width);
+                strip.setPixelColor(x - 1, old_val[x - 1]);
+            }
+            strip.show();
+            delay(speed);
+        }
+        for (int count = NUMPIXELS - 1; count >= 0; count--)
+        {
+            strip.setPixelColor(count, color);
+            old_val[count] = color;
+            for (int x = count; x <= NUMPIXELS; x++)
+            {
+                old_val[x - 1] = dimColor(old_val[x - 1], width);
+                strip.setPixelColor(x + 1, old_val[x + 1]);
+            }
+            strip.show();
+            delay(speed);
+        }
+    }
+}
+void goSolid(int colour)
+{
+    switch (colour)
+    {
+    case '1':
+        for (int i = 0; i < NUMPIXELS; i++)
+        {
+            // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+            strip.setPixelColor(i, strip.Color(200, 0, 0)); // Moderately bright green color.
+            strip.show();                                   // This sends the updated pixel color to the hardware.
+            delay(delayval);                                // Delay for a period of time (in milliseconds).
+        }
+        break;
+    case '2':
+        for (int i = 0; i < NUMPIXELS; i++)
+        {
+            // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+            strip.setPixelColor(i, strip.Color(0, 200, 0)); // Moderately bright green color.
+            strip.show();                                   // This sends the updated pixel color to the hardware.
+            delay(delayval);                                // Delay for a period of time (in milliseconds).
+        }
+        break;
+    case '3':
+        for (int i = 0; i < NUMPIXELS; i++)
+        {
+            // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+            strip.setPixelColor(i, strip.Color(0, 0, 200)); // Moderately bright green color.
+            strip.show();                                   // This sends the updated pixel color to the hardware.
+            delay(delayval);                                // Delay for a period of time (in milliseconds).
+        }
+        break;
+    }
+}
+void kittaLL()
+{
+    knightRider(1, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
+    knightRider(1, 46, 3, 0xFF00FF); // Cycles, Speed, Width, RGB Color (purple)
+    knightRider(1, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
+    knightRider(1, 46, 2, 0x0000FF); // Cycles, Speed, Width, RGB Color (blue)
+    knightRider(1, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
+    knightRider(1, 46, 5, 0xFF0000); // Cycles, Speed, Width, RGB Color (red)     knightRider(1, 46, 6, 0x00FF00); // Cycles, Speed, Width, RGB Color (green)
+    knightRider(1, 46, 7, 0xFFFF00); // Cycles, Speed, Width, RGB Color (yellow)
+    knightRider(1, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
+    knightRider(1, 46, 8, 0x00FFFF); // Cycles, Speed, Width, RGB Color (cyan)
+    knightRider(1, 46, 4, 0xFF1000); // Cycles, Speed, Width, RGB Color (original orange-red)
+    knightRider(1, 46, 2, 0xFFFFFF); // Cycles, Speed, Width, RGB Color (white)
+    clearStrip();
+    delay(1000);
+}
+void copMode()
+{
+    byte width = 2;
+    for (byte jj = 0; jj < 10; jj++)
+    {
+        for (byte j = 0; j < 150; j += 7)
+        {
+            knightRider(1, j, width, 0xFF0000); // Cycles, Speed, Width, RGB Color red
+        }
+        for (byte j = 0; j < 150; j += 7)
+        {
+            knightRider(1, j, width, 0x0000FF); // Cycles, Speed, Width, RGB Color blue
+        }
+    }
+    delay(delayval);
+
+    for (int i = 0; i < NUMPIXELS; i++)
+    {
+        // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+        strip.setPixelColor(i, strip.Color(200, 0, 0)); // Moderately bright green color.
+    }
+    for (int i = 1; i < NUMPIXELS; i++)
+    {
+        // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+        strip.setPixelColor(i, strip.Color(0, 0, 200)); // Moderately bright green color.
+    }
+    strip.show(); // This sends the updated pixel color to the hardware.
+
+    delay(delayval); // Delay for a period of time (in milliseconds).
+    for (byte j = 0; j < 150; j += 7)
+    {
+        knightRider(2, j, width, 0x0000FF); // Cycles, Speed, Width, RGB Color
+        width++;
+    }
+    for (int i = 0; i < NUMPIXELS; i++)
+    {
+        // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+        strip.setPixelColor(i, strip.Color(200, 0, 0)); // Moderately bright green color.
+    }
+    for (int i = 1; i < NUMPIXELS; i++)
+    {
+        // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
+        strip.setPixelColor(i, strip.Color(0, 0, 200)); // Moderately bright green color.
+    }
+    strip.show(); // This sends the updated pixel color to the hardware.
+    delay(delayval);
+    clearStrip();
+}
+void rainBow()
+{
+    byte width = 2;
+    for (byte j = 0; j < 150; j += 7)
+    {                                            // Iterate through a whole rainbow of colors
+        knightRider(1, j, width, colorWheel(j)); // Cycles, Speed, Width, RGB Color
+        width++;
+    }
+    clearStrip();
+}

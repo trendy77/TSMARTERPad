@@ -336,7 +336,6 @@ decode_results results;  // Somewhere to store the results
 
 void getTemperature()
 {
-#ifdef E81111
   sensors_event_t event;
   dht.temperature().getEvent(&event);
   if (isnan(event.temperature))
@@ -364,51 +363,76 @@ void getTemperature()
   }
   dtostrf(tempC, 2, 2, tempString);
   dtostrf(humidQ, 2, 2, humidString);
+  
+  
   ThingSpeak.setField(Tfield, tempC);
   ThingSpeak.setField(Hfield, humidQ);
   ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
-#endif
 
-#ifdef N18650
+`#ifdef ESPMEGA
   tempC = ThingSpeak.readFloatField(myChannelNumber, 3);
   humidQ = ThingSpeak.readFloatField(myChannelNumber, 4);
   float lux = ThingSpeak.readFloatField(myChannelNumber, 5);
 #endif
 }
 
+
+
 void setup()
 {
+
+#ifdef N18650
+  display.init();
+  display.clear();
+  display.display();
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setContrast(255);
+  drawProgress(display, 20, "starting...");
+  ui.setTargetFPS(30);
+  ui.setActiveSymbol(activeSymbol);
+  ui.setInactiveSymbol(inactiveSymbol);
+  ui.setIndicatorPosition(BOTTOM);
+  ui.setFrameAnimation(SLIDE_LEFT);
+  ui.setFrames(frames, numberOfFrames);
+  ui.setOverlays(overlays, numberOfOverlays);
+  ui.init();
+#endif  
+  
+  
   Serial.begin(115200);
   WiFi.config(ip, gateway, subnet);
   String hostname(HOST_NAME);
   WiFi.hostname(hostname);
+  
+  #ifdef N18650
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  drawProgress(display, 20, "STARTING WIFI...");
+  display.display();
+  #endif
+      
   WiFi.begin(ssid, pass);
   int counter = 0;
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
     Serial.print(".");
-
-#ifdef N18650
-    display.init();
-    display.clear();
-    display.display();
-    display.setFont(ArialMT_Plain_10);
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    display.setContrast(255);
-
-    drawProgress(display, 80, "Updating thingspeak...");
-    lastUpdate = millis();
-    drawProgress(display, 100, "Done...");
+    #ifdef N18650
     display.drawXbm(60, 30, 8, 8, counter % 3 == 1 ? activeSymbol : inactiveSymbol);
     display.drawXbm(74, 30, 8, 8, counter % 3 == 2 ? activeSymbol : inactiveSymbol);
     display.display();
-#endif
-
+    #endif
     counter++;
   }
 
-#ifdef E81111
+  #ifdef N18650
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  drawProgress(display, 40, "STARTING TEMP...");
+  display.display();
+  #endif
+  
   dht.begin();
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
@@ -450,8 +474,12 @@ void setup()
   Serial.println("%");
   Serial.println("------------------------------------");
   delayMS = sensor.min_delay / 1000;
+#ifdef N18650
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    drawProgress(display, 60, "SETTING UP OTA...");
+    display.display();
 #endif
-
   Serial.println("Hostname: " + hostname);
   ArduinoOTA.onStart([]() {
     String type;
@@ -486,34 +514,36 @@ void setup()
       Serial.println("Auth Failed");
     else if (error == OTA_BEGIN_ERROR)
       Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR)
+    else if (error == OTA_CONNECT
+  ArduinoOTA.onProgress(drawOtaProgress);
+  updateData(&display);_ERROR)
       Serial.println("Connect Failed");
     else if (error == OTA_RECEIVE_ERROR)
       Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR)
       Serial.println("End Failed");
   });
-  ArduinoOTA.begin();
-  Serial.println("Ready");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  WiFi.hostname(hostname);
-  ThingSpeak.begin(client);
 
-#ifdef N18650
-  ui.setTargetFPS(30);
-  ui.setActiveSymbol(activeSymbol);
-  ui.setInactiveSymbol(inactiveSymbol);
-  ui.setIndicatorPosition(BOTTOM);
-  ui.setFrameAnimation(SLIDE_LEFT);
-  ui.setFrames(frames, numberOfFrames);
-  ui.setOverlays(overlays, numberOfOverlays);
-  ui.init();
   ArduinoOTA.onProgress(drawOtaProgress);
   updateData(&display);
-#endif
-  Serial.println("Hostname: " + hostname);
+  
   ArduinoOTA.begin();
+
+#ifdef N18650
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    drawProgress(display, 80, "OTA Hostname: " + hostname);
+    display.display();
+#endif
+  Serial.println("Ready");
+  Serial.println(WiFi.localIP());
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    drawProgress(display, 100, "READY.");
+    display.display();
+    delay(2000);
+#endif
+
 }
 
 void loop()
